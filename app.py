@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import tensorflow as tf
+import seaborn as sns
 
 from custom_layers import SelectiveSSM, MambaBlock
 from model_config import (
@@ -253,39 +254,174 @@ elif page == "Model Information":
     )
 
 elif page == "Evaluation":
-    st.subheader("Model evaluation and comparison")
-    st.write(
-        "To display genuine test metrics, upload the results CSV created by your "
-        "training notebook. The app does not invent accuracy values."
-    )
-    results_file = st.file_uploader(
-        "Upload CNN_Mamba_SNR_Range_Results2.csv",
-        type=["csv"],
-        key="results_csv"
-    )
-    if results_file is not None:
-        try:
-            results = pd.read_csv(results_file)
-            st.dataframe(results, use_container_width=True)
-            if "Test_Accuracy_Percent" in results.columns and "Range" in results.columns:
-                chart_data = results[["Range", "Test_Accuracy_Percent"]].set_index("Range")
-                st.markdown("#### Test accuracy by SNR range")
-                st.bar_chart(chart_data)
-            else:
-                st.info(
-                    "CSV loaded. Expected columns `Range` and "
-                    "`Test_Accuracy_Percent` for the accuracy chart."
-                )
-        except Exception as exc:
-            st.error(f"Could not read evaluation CSV: {exc}")
 
-    st.markdown("### Confusion matrix / classification report")
+    st.subheader("CNN-Mamba Model Evaluation")
+
     st.write(
-        "These require labeled test samples and their predictions. The current "
-        "training script saves model accuracy in a CSV, but does not save the "
-        "per-sample test labels or predictions. We can add an evaluation export "
-        "to the notebook as the next step."
+        "Performance evaluation of six CNN-Mamba models "
+        "using independent test datasets."
     )
+
+    # ==========================================
+    # 1. OVERALL PERFORMANCE
+    # ==========================================
+
+    st.markdown("## 1. Overall Model Performance")
+
+    overall_file = st.file_uploader(
+        "Upload Overall Performance CSV",
+        type=["csv"],
+        key="overall_csv"
+    )
+
+    if overall_file is not None:
+
+        overall_df = pd.read_csv(overall_file)
+
+        st.dataframe(
+            overall_df,
+            use_container_width=True
+        )
+
+        st.markdown("### Accuracy Comparison")
+
+        accuracy_chart = overall_df[
+            ["SNR Range", "Accuracy (%)"]
+        ].set_index("SNR Range")
+
+        st.bar_chart(accuracy_chart)
+
+        st.markdown("### Macro F1-Score Comparison")
+
+        f1_chart = overall_df[
+            ["SNR Range", "Macro F1 Score"]
+        ].set_index("SNR Range")
+
+        st.bar_chart(f1_chart)
+
+    st.markdown("---")
+
+    # ==========================================
+    # 2. CLASSIFICATION REPORT
+    # ==========================================
+
+    st.markdown("## 2. Classification Report")
+
+    report_file = st.file_uploader(
+        "Upload Classification Report CSV",
+        type=["csv"],
+        key="report_csv"
+    )
+
+    if report_file is not None:
+
+        report_df = pd.read_csv(report_file)
+
+        selected_range = st.selectbox(
+            "Select SNR Range",
+            report_df["SNR Range"].unique(),
+            key="report_select"
+        )
+
+        filtered_report = report_df[
+            report_df["SNR Range"] == selected_range
+        ]
+
+        st.markdown(
+            f"### Classification Report - {selected_range}"
+        )
+
+        st.dataframe(
+            filtered_report,
+            use_container_width=True
+        )
+
+        c1, c2, c3 = st.columns(3)
+
+        c1.metric(
+            "Average Precision",
+            f"{filtered_report['Precision'].mean() * 100:.2f}%"
+        )
+
+        c2.metric(
+            "Average Recall",
+            f"{filtered_report['Recall'].mean() * 100:.2f}%"
+        )
+
+        c3.metric(
+            "Average F1-Score",
+            f"{filtered_report['F1 Score'].mean() * 100:.2f}%"
+        )
+
+    st.markdown("---")
+
+    # ==========================================
+    # 3. CONFUSION MATRIX
+    # ==========================================
+
+    st.subheader("Confusion Matrix")
+
+confusion_file = st.file_uploader(
+    "Upload Confusion_Matrix_Data.csv",
+    type=["csv"],
+    key="confusion_upload"
+)
+
+if confusion_file is not None:
+
+    confusion_df = pd.read_csv(confusion_file)
+
+    selected_range = st.selectbox(
+        "Select SNR Range",
+        [f"Range_{i}" for i in range(1, 7)],
+        key="confusion_range"
+    )
+
+    filtered_df = confusion_df[
+        confusion_df["SNR Range"] == selected_range
+    ]
+
+    if not filtered_df.empty:
+
+        cm = filtered_df.pivot(
+            index="Actual_Class",
+            columns="Predicted_Class",
+            values="Count"
+        )
+
+        cm = cm.reindex(
+            index=CLASS_NAMES,
+            columns=CLASS_NAMES,
+            fill_value=0
+        )
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=CLASS_NAMES,
+            yticklabels=CLASS_NAMES,
+            ax=ax
+        )
+
+        ax.set_xlabel("Predicted Modulation")
+        ax.set_ylabel("Actual Modulation")
+        ax.set_title(f"Confusion Matrix - {selected_range}")
+
+        st.pyplot(fig)
+        plt.close(fig)
+
+    else:
+        st.warning("No confusion matrix data found for this range.")
+    st.markdown("---")
+
+    st.success(
+        "CNN-Mamba evaluation results loaded successfully."
+    )
+
 
 st.sidebar.markdown("---")
 st.sidebar.caption("CNN–Mamba AMC • RadioML 2016.10a")
