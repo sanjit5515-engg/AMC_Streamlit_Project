@@ -70,15 +70,15 @@ the training pipeline exactly.
 1. **Class order:** `CLASS_NAMES` is currently set to the lexicographically sorted
    RadioML 2016.10a labels. Verify it matches the exact `mods` printed by your
    training script. Output index 0 must map to `mods[0]`, and so on.
-2. **SNR 10 dB:** The original training code uses `snr > 10` for Range 1 and
-   `5 <= snr < 10` for Range 2. Therefore 10 dB is not included in any model.
-   This application deliberately does not classify 10 dB.
-3. **Model loading:** Custom `SelectiveSSM` and `MambaBlock` layers are provided.
+
+2. **Model loading:** Custom `SelectiveSSM` and `MambaBlock` layers are provided.
    If loading fails, retain the full traceback and check the TensorFlow/Keras
    version used to save the `.keras` files.
-4. **Preprocessing:** Feed raw I/Q samples with the same preprocessing as training.
+
+3. **Preprocessing:** Feed raw I/Q samples with the same preprocessing as training.
    Do not apply normalization unless the training pipeline did so.
-5. **Performance:** The model's softmax maximum is a confidence score, not a
+   
+4. **Performance:** The model's softmax maximum is a confidence score, not a
    calibrated guarantee of correctness.
 
 ## 8. Evaluation Results
