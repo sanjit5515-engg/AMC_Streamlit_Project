@@ -248,10 +248,7 @@ elif page == "Model Information":
         "- Global average pooling and dense classification head\n"
         "- Output: 11 modulation classes"
     )
-    st.warning(
-        "SNR = 10 dB is included in the updated Range_1 training group. "
-        "The app routes 10 dB to the retrained Range_1 model."
-    )
+    
 
 elif page == "Evaluation":
 
@@ -359,63 +356,122 @@ elif page == "Evaluation":
     # 3. CONFUSION MATRIX
     # ==========================================
 
-    st.subheader("Confusion Matrix")
+    st.markdown("## 3. Confusion Matrix")
 
-confusion_file = st.file_uploader(
-    "Upload Confusion_Matrix_Data.csv",
-    type=["csv"],
-    key="confusion_upload"
-)
-
-if confusion_file is not None:
-
-    confusion_df = pd.read_csv(confusion_file)
-
-    selected_range = st.selectbox(
-        "Select SNR Range",
-        [f"Range_{i}" for i in range(1, 7)],
-        key="confusion_range"
+    confusion_file = st.file_uploader(
+        "Upload Confusion_Matrix_Data.csv",
+        type=["csv"],
+        key="confusion_upload"
     )
 
-    filtered_df = confusion_df[
-        confusion_df["SNR Range"] == selected_range
-    ]
+    if confusion_file is not None:
+        try:
+            confusion_df = pd.read_csv(confusion_file)
 
-    if not filtered_df.empty:
+            # Remove accidental spaces from CSV headers and text values.
+            confusion_df.columns = confusion_df.columns.astype(str).str.strip()
 
-        cm = filtered_df.pivot(
-            index="Actual_Class",
-            columns="Predicted_Class",
-            values="Count"
-        )
+            required_columns = [
+                "SNR Range", "Actual_Class", "Predicted_Class", "Count"
+            ]
+            missing_columns = [
+                col for col in required_columns if col not in confusion_df.columns
+            ]
 
-        cm = cm.reindex(
-            index=CLASS_NAMES,
-            columns=CLASS_NAMES,
-            fill_value=0
-        )
+            if missing_columns:
+                st.error(
+                    "The CSV is missing required columns: "
+                    + ", ".join(missing_columns)
+                )
+            else:
+                for col in ["SNR Range", "Actual_Class", "Predicted_Class"]:
+                    confusion_df[col] = (
+                        confusion_df[col].astype(str).str.strip()
+                    )
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+                confusion_df["Count"] = pd.to_numeric(
+                    confusion_df["Count"], errors="coerce"
+                )
 
-        sns.heatmap(
-            cm,
-            annot=True,
-            fmt="d",
-            cmap="Blues",
-            xticklabels=CLASS_NAMES,
-            yticklabels=CLASS_NAMES,
-            ax=ax
-        )
+                if confusion_df["Count"].isna().any():
+                    st.error(
+                        "The Count column contains blank or non-numeric values. "
+                        "Please check the CSV."
+                    )
+                elif (confusion_df["Count"] < 0).any():
+                    st.error("The Count column cannot contain negative values.")
+                else:
+                    available_ranges = [
+                        f"Range_{i}" for i in range(1, 7)
+                        if f"Range_{i}" in confusion_df["SNR Range"].unique()
+                    ]
 
-        ax.set_xlabel("Predicted Modulation")
-        ax.set_ylabel("Actual Modulation")
-        ax.set_title(f"Confusion Matrix - {selected_range}")
+                    if not available_ranges:
+                        st.error(
+                            "No valid SNR ranges (Range_1 to Range_6) "
+                            "were found in the uploaded CSV."
+                        )
+                    else:
+                        selected_range = st.selectbox(
+                            "Select SNR Range",
+                            available_ranges,
+                            key="confusion_range"
+                        )
 
-        st.pyplot(fig)
-        plt.close(fig)
+                        filtered_df = confusion_df[
+                            confusion_df["SNR Range"] == selected_range
+                        ].copy()
 
-    else:
-        st.warning("No confusion matrix data found for this range.")
+                        # Build a complete 11 x 11 matrix in model class order.
+                        cm = filtered_df.pivot_table(
+                            index="Actual_Class",
+                            columns="Predicted_Class",
+                            values="Count",
+                            aggfunc="sum",
+                            fill_value=0
+                        )
+                        cm = cm.reindex(
+                            index=CLASS_NAMES,
+                            columns=CLASS_NAMES,
+                            fill_value=0
+                        )
+
+                        # Show the confusion matrix as a regular data table.
+                        # This avoids all plotting-library and rendering issues.
+                        st.markdown(f"### Confusion Matrix - {selected_range}")
+                        st.caption(
+                            "Rows = actual modulation classes; "
+                            "columns = predicted modulation classes."
+                        )
+
+                        display_cm = cm.copy()
+                        display_cm.index.name = "Actual \\ Predicted"
+                        display_cm.columns.name = "Predicted Modulation"
+
+                        st.dataframe(
+                            display_cm,
+                            use_container_width=True,
+                            height=440
+                        )
+
+                        st.metric(
+                            "Total test samples",
+                            f"{int(cm.to_numpy().sum()):,}"
+                        )
+
+                        # Let the user download the selected 11 x 11 matrix.
+                        matrix_csv = display_cm.to_csv().encode("utf-8")
+                        st.download_button(
+                            label="Download this confusion matrix",
+                            data=matrix_csv,
+                            file_name=f"{selected_range}_Confusion_Matrix.csv",
+                            mime="text/csv",
+                            key=f"download_{selected_range}"
+                        )
+
+        except Exception as exc:
+            st.error(f"Could not display the confusion matrix: {exc}")
+
     st.markdown("---")
 
     st.success(
