@@ -42,7 +42,13 @@ python -m streamlit run app.py
 
 Streamlit will print a local address, usually `http://localhost:8501`.
 
-## 4. Input format
+## 4. Deployment
+The application is deployed using Streamlit Community Cloud.
+
+Application:
+https://cnn-mamba-modulation-classification.streamlit.app/
+
+## 5. Input format
 
 Upload one signal as either:
 
@@ -52,8 +58,14 @@ Upload one signal as either:
 The app transposes `(2, 128)` to `(128, 2)` and converts to `float32`.
 It does not normalize or rescale the signal, because preprocessing must match
 the training pipeline exactly.
-
-## 5. Important checks before relying on predictions
+## 6. Instructions
+1. Download an I/Q sample CSV file.
+2. Open the deployed Streamlit application.
+3. Navigate to Signal Classification.
+4. Upload the I/Q sample.
+5. Select the corresponding SNR value.
+6. View the predicted modulation class.
+## 7. Important checks before relying on predictions
 
 1. **Class order:** `CLASS_NAMES` is currently set to the lexicographically sorted
    RadioML 2016.10a labels. Verify it matches the exact `mods` printed by your
@@ -69,8 +81,8 @@ the training pipeline exactly.
 5. **Performance:** The model's softmax maximum is a confidence score, not a
    calibrated guarantee of correctness.
 
-## 6. Evaluation
-
-The Evaluation page can display `CNN_Mamba_SNR_Range_Results2.csv` produced by
-the training notebook. Confusion matrices and classification reports need
-saved test labels/predictions; these are not fabricated by this app.
+## 8. Evaluation Results
+The Evaluation Results folder contains:
+- Overall performance metrics
+- Classification report
+- Confusion matrix data
